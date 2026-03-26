@@ -1,0 +1,6 @@
+; Link11SLEW.def : 声明 DLL 的模块参数。
+
+LIBRARY      "Link11SLEW"
+
+EXPORTS
+    ; 此处可以是显式导出

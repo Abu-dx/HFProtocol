@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="gb2312"?>
+<VisualStudioProject
+	ProjectType="Intel C++ Project"
+	Version="12.1"
+	Name="HFsys"
+	ProjectGUID="{8EC0266F-1390-432A-9015-1273E0124522}"
+	VCNestedProjectGUID="{2AF76051-9FD8-4BEE-B88D-FC3670951451}"
+	VCNestedProjectFileName="HFsys.vcproj"
+	>
+	<Configurations/>
+	<Files/>
+</VisualStudioProject>
