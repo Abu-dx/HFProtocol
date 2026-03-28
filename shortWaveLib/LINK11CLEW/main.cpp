@@ -50,6 +50,7 @@
 #include "SgnlPrcsDll.h"
 #include "SignalDemodProbe.h"
 #include "DataFIRDF.h"
+#include "../common/InputAudio.h"
 #include "../common/InputParser.h"
 #include "../shortWaveProtocalWaveLib/ProtolDetect.h"
 
@@ -76,6 +77,18 @@ struct OutList
 
 OutList gl_OutList;
 
+namespace fs = std::filesystem;
+
+struct RuntimeOverrides
+{
+    bool hasFrequency = false;
+    double frequency = 0.0;
+    bool hasDataRate = false;
+    int dataRate = 0;
+};
+
+RuntimeOverrides g_runtimeOverrides;
+
 // 调制协议枚举类（映射switch case数字到协议类型）
 enum class ProtocolType {
     LINK11_CLEW = 1,    // case 1
@@ -91,19 +104,17 @@ enum class ProtocolType {
     PI4QPSK = 11        // case 19
 };
 
-void link11CLEW_test(const std::string& filePath);
-void link11SLEW_test(const std::string& filePath);
-void MIL141A_test(const std::string& filePath);
-void MIL141B_test(const std::string& filePath);
-void MIL110A_test(const std::string& filePath);
-void MIL110B_test(const std::string& filePath);
-void STANAG4285_test(const std::string& filePath);
-void STANAG4529_test(const std::string& filePath);
-void KG84_test(const std::string& filePath);
-void FSK2_BCH_test(const std::string& filePath);
-void PI4QPSK_test(const std::string& filePath);
-
-namespace fs = std::filesystem;
+void link11CLEW_test(const fs::path& filePath);
+void link11SLEW_test(const fs::path& filePath);
+void MIL141A_test(const fs::path& filePath);
+void MIL141B_test(const fs::path& filePath);
+void MIL110A_test(const fs::path& filePath);
+void MIL110B_test(const fs::path& filePath);
+void STANAG4285_test(const fs::path& filePath);
+void STANAG4529_test(const fs::path& filePath);
+void KG84_test(const fs::path& filePath);
+void FSK2_BCH_test(const fs::path& filePath);
+void PI4QPSK_test(const fs::path& filePath);
 
 std::string ProtocolTypeName(ProtocolType protocol)
 {
@@ -208,15 +219,21 @@ void PrintUsage(const char* exeName)
 {
     std::cout
         << "Usage:\n"
-        << "  " << exeName << " <input_path> [-p protocol] [--search-dir dir]\n"
+        << "  " << exeName << " <input_path> [-p protocol] [--search-dir dir] [--frequency hz] [--data-rate bps]\n"
         << "  " << exeName << "                     (interactive mode)\n\n"
+        << "Input format:\n"
+        << "  raw PCM short data or 16-bit mono PCM WAV\n\n"
         << "Protocol aliases:\n"
         << "  auto, link11clew, link11slew, mil110a, mil110b, mil141a, mil141b,\n"
         << "  4285, 4529, kg84, fsk2bch, pi4qpsk\n\n"
+        << "Optional overrides:\n"
+        << "  --frequency 1800    Override initial center frequency in Hz when the decoder supports it.\n"
+        << "  --data-rate 2400    Override initial data rate when the decoder supports it.\n\n"
         << "Examples:\n"
         << "  " << exeName << " E:\\data\\file.wav\n"
         << "  " << exeName << " \"E:\\data\\file.wav\" -p link11clew\n"
-        << "  " << exeName << " .\\file.wav -p auto\n";
+        << "  " << exeName << " .\\file.wav -p auto\n"
+        << "  " << exeName << " sample.wav -p 4285 --frequency 1800 --data-rate 2400\n";
 }
 
 bool PromptProtocolMenu(std::string& protocolToken)
@@ -246,8 +263,11 @@ bool PromptProtocolMenu(std::string& protocolToken)
 #if !defined(_WIN64)
 bool DetectProtocolForFile(const fs::path& inputPath, ProtocolType& protocol)
 {
-    std::ifstream fin(inputPath, std::ios::binary | std::ios::in);
-    if (!fin.is_open()) {
+    std::ifstream fin;
+    std::string error;
+    hfaudio::AudioInputInfo inputInfo;
+    if (!hfaudio::OpenPcm16InputStream(inputPath, fin, inputInfo, error)) {
+        std::cerr << error << "\n";
         return false;
     }
 
@@ -307,7 +327,7 @@ bool DetectProtocolForFile(const fs::path&, ProtocolType&)
 }
 #endif
 
-void RunProtocol(ProtocolType protocol, const std::string& filePath)
+void RunProtocol(ProtocolType protocol, const fs::path& filePath)
 {
     switch (protocol)
     {
@@ -350,6 +370,21 @@ void RunProtocol(ProtocolType protocol, const std::string& filePath)
     }
 }
 
+bool OpenProtocolInput(
+    const fs::path& filePath,
+    std::ifstream& fin,
+    std::uint64_t& sampleCount,
+    std::string& error)
+{
+    hfaudio::AudioInputInfo inputInfo;
+    if (!hfaudio::OpenPcm16InputStream(filePath, fin, inputInfo, error)) {
+        return false;
+    }
+
+    sampleCount = hfaudio::SampleCount(inputInfo);
+    return true;
+}
+
 // 文件解调星座结果 
 #define MAX_SEGMENT_SIZE 8192
 short   pDataFiledemode[2][2 * MAX_SEGMENT_SIZE]; 
@@ -366,21 +401,16 @@ std::string SampleToTime(DWORD sample, float sampleRate)
 
 
 
-void link11CLEW_test(const std::string& filePath)
+void link11CLEW_test(const fs::path& filePath)
 {
-    // 打开 .wav 音频文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
 
 
 
@@ -402,7 +432,7 @@ void link11CLEW_test(const std::string& filePath)
 
 
     float fs = 9.6e3;
-    float fc = 605.0;
+    float fc = static_cast<float>(g_runtimeOverrides.hasFrequency ? g_runtimeOverrides.frequency : 605.0);
     float Insample = fs;
     float Outsample = 7040.0f;
     float rFreq = fc / Insample;
@@ -519,21 +549,16 @@ void link11CLEW_test(const std::string& filePath)
 
 
 
-void link11SLEW_test(const std::string& filePath)
+void link11SLEW_test(const fs::path& filePath)
 {
-    // 打开 .wav 音频文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
 
     // 初始化参数变量，分配IPP内存
     const int nLeng = 6000;
@@ -546,7 +571,7 @@ void link11SLEW_test(const std::string& filePath)
 
     // 初始化解调参数
     float fs = 9.6e3;
-    float fc = 1.8e3;
+    float fc = static_cast<float>(g_runtimeOverrides.hasFrequency ? g_runtimeOverrides.frequency : 1.8e3);
     float Insample = fs;
     float Outsample = 9.6e3;
     float rFreq = fc / Insample;
@@ -663,27 +688,21 @@ void link11SLEW_test(const std::string& filePath)
 }
 
 
-void MIL141A_test(const std::string& filePath)
+void MIL141A_test(const fs::path& filePath)
 {
     // 原版关键参数统一（替换零散变量）
     const double m_FileInsample = 9600.0;  // 输入采样率
-    const double m_FileFc = 1625.0;  // 中频频率
+    const double m_FileFc = g_runtimeOverrides.hasFrequency ? g_runtimeOverrides.frequency : 1625.0;  // 中频频率
     const int    nLeng = 6000;    // 每次读取的样本长度
 
-    // 打开输入文件（标准C++ fstream）
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        fprintf(stderr, "Error: Open input file failed! Path: %s\n", filePath.c_str());
+        std::cerr << openError << "\n";
         return;
     }
-
-
-    //  获取文件长度（样本数）
-    fin.seekg(0, std::ios::end);
-    const uint64_t fileSizeBytes = static_cast<uint64_t>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    const uint64_t m_FileLength = fileSizeBytes / sizeof(Ipp16s); // 总样本数（short类型）
 
 
     // 内存分配（替换ippsMalloc为标准malloc，添加失败检查）
@@ -799,21 +818,16 @@ void MIL141A_test(const std::string& filePath)
 }
 
 
-void MIL141B_test(const std::string& filePath)
+void MIL141B_test(const fs::path& filePath)
 {
-    // 打开 .wav 音频文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
 
 
 
@@ -935,21 +949,16 @@ void MIL141B_test(const std::string& filePath)
 
 
 
-void MIL110A_test(const std::string& filePath)
+void MIL110A_test(const fs::path& filePath)
 {
-    // 打开 .wav 音频文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
 
     // 初始化参数变量，分配IPP内存
     const int nLeng = 6000;
@@ -962,7 +971,7 @@ void MIL110A_test(const std::string& filePath)
 
     // 初始化解调参数
     float fs = 9.6e3;
-    float fc = 1.8e3;
+    float fc = static_cast<float>(g_runtimeOverrides.hasFrequency ? g_runtimeOverrides.frequency : 1.8e3);
     float Insample = fs;
     float Outsample = 9.6e3;
     float rFreq = fc / Insample;
@@ -1059,28 +1068,23 @@ void MIL110A_test(const std::string& filePath)
     delete[] headType;
 
     fin.close();
-    printf("MIL141A demod complete! Total processed samples: %lu, Total messages: %d\n",
+    printf("MIL110A demod complete! Total processed samples: %lu, Total messages: %d\n",
         dataHavePro, allheadNum);
 
     return;
 }
 
 
-void MIL110B_test(const std::string& filePath)
+void MIL110B_test(const fs::path& filePath)
 {
-    // 打开 .wav 音频文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
 
     // 初始化参数变量，分配IPP内存
     const int nLeng = 6000;
@@ -1093,7 +1097,7 @@ void MIL110B_test(const std::string& filePath)
 
     // 初始化解调参数
     float fs = 9.6e3;
-    float fc = 1.8e3;
+    float fc = static_cast<float>(g_runtimeOverrides.hasFrequency ? g_runtimeOverrides.frequency : 1.8e3);
     float Insample = fs;
     float Outsample = 9.6e3;
     float rFreq = fc / Insample;
@@ -1190,28 +1194,23 @@ void MIL110B_test(const std::string& filePath)
     delete[] headType;
 
     fin.close();
-    printf("MIL141A demod complete! Total processed samples: %lu, Total messages: %d\n",
+    printf("MIL110B demod complete! Total processed samples: %lu, Total messages: %d\n",
         dataHavePro, allheadNum);
 
     return;
 }
 
 
-void STANAG4285_test(const std::string& filePath)
+void STANAG4285_test(const fs::path& filePath)
 {
-    // 打开 .dat 数据文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
 
     // 初始化参数变量，分配IPP内存
     const int nLeng = 6000;
@@ -1224,7 +1223,7 @@ void STANAG4285_test(const std::string& filePath)
 
     // 初始化解调参数
     float fs = 9.6e3;
-    float fc = 1.8e3;
+    float fc = static_cast<float>(g_runtimeOverrides.hasFrequency ? g_runtimeOverrides.frequency : 1.8e3);
     float Insample = fs;
     float Outsample = 9.6e3;
     float rFreq = fc / Insample;
@@ -1267,7 +1266,7 @@ void STANAG4285_test(const std::string& filePath)
         1 - 对应 UI 选项："Short"（短交织）
         2 - 对应 UI 选项："Long"（长交织，默认值）
     */
-    int dataRate = 3600;
+    int dataRate = g_runtimeOverrides.hasDataRate ? g_runtimeOverrides.dataRate : 3600;
     int FECType = 1;
     int InterType = 2;
 
@@ -1356,21 +1355,16 @@ void STANAG4285_test(const std::string& filePath)
 
 
 
-void STANAG4529_test(const std::string& filePath)
+void STANAG4529_test(const fs::path& filePath)
 {
-    // 打开 .dat 数据文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t m_FileLength = 0;
+    if (!OpenProtocolInput(filePath, fin, m_FileLength, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
 
     // 初始化参数变量，分配IPP内存
     const int nLeng = 6000;
@@ -1383,7 +1377,7 @@ void STANAG4529_test(const std::string& filePath)
 
     // 初始化解调参数
     float fs = 9.6e3;
-    float fc = 2e3;
+    float fc = static_cast<float>(g_runtimeOverrides.hasFrequency ? g_runtimeOverrides.frequency : 2e3);
     float Insample = fs;
     float Outsample = 9.6e3;
     float rFreq = fc / Insample;
@@ -1420,7 +1414,7 @@ void STANAG4529_test(const std::string& filePath)
         2 - 对应 UI 选项："Long"（长交织）
         默认值：2（Long）
     */
-    int dataRate = 1800;
+    int dataRate = g_runtimeOverrides.hasDataRate ? g_runtimeOverrides.dataRate : 1800;
     int FECType = 1;
     int InterType = 2;
 
@@ -1500,27 +1494,23 @@ void STANAG4529_test(const std::string& filePath)
     delete[] headType;
 
     fin.close();
-    printf("STANAG4285 demod complete! Total processed samples: %lu, Total messages: %d\n",
+    printf("STANAG4529 demod complete! Total processed samples: %lu, Total messages: %d\n",
         dataHavePro, allheadNum);
 }
 
 
 
-void KG84_test(const std::string& filePath)
+void KG84_test(const fs::path& filePath)
 {
-    // 打开 .dat 数据文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t sampleCount = 0;
+    if (!OpenProtocolInput(filePath, fin, sampleCount, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
+    const size_t m_FileLength = static_cast<size_t>(sampleCount);
 
 
     // 读取文件全部数据
@@ -1603,21 +1593,17 @@ void KG84_test(const std::string& filePath)
 }
 
 
-void FSK2_BCH_test(const std::string& filePath)
+void FSK2_BCH_test(const fs::path& filePath)
 {
-    // 打开 .dat 数据文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t sampleCount = 0;
+    if (!OpenProtocolInput(filePath, fin, sampleCount, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
+    const size_t m_FileLength = static_cast<size_t>(sampleCount);
 
     // 读取文件全部数据
     int16_t* sdata = (int16_t*)malloc(sizeof(int16_t) * m_FileLength);
@@ -1700,21 +1686,17 @@ void FSK2_BCH_test(const std::string& filePath)
 }
 
 
-void PI4QPSK_test(const std::string& filePath)
+void PI4QPSK_test(const fs::path& filePath)
 {
-    // 打开 .dat 数据文件
-    std::ifstream fin(filePath, std::ios::binary | std::ios::in);
-    if (!fin.is_open())
+    std::ifstream fin;
+    std::string openError;
+    std::uint64_t sampleCount = 0;
+    if (!OpenProtocolInput(filePath, fin, sampleCount, openError))
     {
-        printf("Open input file failed!\n");
+        std::cerr << openError << "\n";
         return;
     }
-
-    // 获取文件长度（替换GetFileSizeEx）
-    fin.seekg(0, std::ios::end);
-    ULONG fileSizeBytes = static_cast<ULONG>(fin.tellg());
-    fin.seekg(0, std::ios::beg);
-    ULONG m_FileLength = fileSizeBytes / sizeof(short);
+    const size_t m_FileLength = static_cast<size_t>(sampleCount);
 
 
     // 读取文件全部数据
@@ -1819,6 +1801,10 @@ int main(int argc, char* argv[])
 
     fs::path resolvedPath = options.resolved_input;
     std::string protocolToken = options.protocol;
+    g_runtimeOverrides.hasFrequency = options.frequency.has_value();
+    g_runtimeOverrides.frequency = options.frequency.value_or(0.0);
+    g_runtimeOverrides.hasDataRate = options.data_rate.has_value();
+    g_runtimeOverrides.dataRate = options.data_rate.value_or(0);
     if (resolvedPath.empty()) {
         while (true) {
             std::string inputLine;
@@ -1857,6 +1843,6 @@ int main(int argc, char* argv[])
 
     std::cout << "Input: " << resolvedPath.string() << "\n";
     std::cout << "Protocol: " << ProtocolTypeName(protocol) << "\n";
-    RunProtocol(protocol, resolvedPath.string());
+    RunProtocol(protocol, resolvedPath);
     return 0;
 }

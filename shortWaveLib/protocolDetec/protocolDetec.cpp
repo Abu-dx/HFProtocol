@@ -12,6 +12,7 @@
 #include <string>
 
 #include "ProtolDetect.h"
+#include "../common/InputAudio.h"
 #include "../common/InputParser.h"
 
 #pragma comment(lib, "ProtolDetect.lib")
@@ -82,6 +83,8 @@ void PrintUsage(const char* exeName)
         << "Usage:\n"
         << "  " << exeName << " <input_path> [-p protocol] [--search-dir dir]\n"
         << "  " << exeName << "                     (interactive mode)\n\n"
+        << "Input format:\n"
+        << "  raw PCM short data or 16-bit mono PCM WAV\n\n"
         << "Protocol aliases:\n"
         << "  auto, mil110a, mil110b, mil141a, mil141b, link11slew, link11clew, 4285, 4529\n";
 }
@@ -151,9 +154,10 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::ifstream fin(resolvedPath, std::ios::binary | std::ios::in);
-    if (!fin.is_open()) {
-        std::cerr << "Open input file failed: " << resolvedPath.string() << "\n";
+    std::ifstream fin;
+    hfaudio::AudioInputInfo inputInfo;
+    if (!hfaudio::OpenPcm16InputStream(resolvedPath, fin, inputInfo, error)) {
+        std::cerr << error << "\n";
         return 1;
     }
 

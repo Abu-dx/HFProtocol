@@ -123,18 +123,139 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 1. 打开：
    - `shortWaveLib/LINK11CLEW.sln`
 2. 构建 `LINK11CLEW`（建议先试 `Release | Win32`）。
-3. 运行后按顺序输入：
-   - 第一行：待处理文件路径
-   - 第二行：协议编号（见第 4 节）
+3. 现在既支持命令行传参，也支持交互模式：
+   - 命令行模式：直接传文件路径和协议参数
+   - 交互模式：直接运行程序后按提示输入
+
+命令行示例：
+
+```powershell
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\STANAG-S4285.wav -p 4285
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\M110B.wav -p auto
+.\LINK11CLEW.exe .\shortWave-Package\data\STANAG-S4285.wav -p 4285 --frequency 1800 --data-rate 2400
+```
+
+交互模式示例：
+
+```powershell
+.\LINK11CLEW.exe
+```
+
+然后按提示输入文件路径与协议编号。
+
+## 7. 控制台入口增强说明
+
+当前 `shortWaveLib/LINK11CLEW` 和 `shortWaveLib/protocolDetec` 的入口层已经补充以下能力：
+
+### 7.1 更友好的输入路径
+
+支持：
+
+- Windows 反斜杠路径，如 `E:\data\file.wav`
+- 斜杠路径，如 `E:/data/file.wav`
+- 相对路径，如 `.\file.wav`
+- 仅文件名，如 `file.wav`
+
+如果只输入文件名，程序会自动在以下目录中查找：
+
+- 当前工作目录
+- `test_data`
+- `shortWave-Package/data`
+- `D:/0_kunshan/短波数据db`
+- `--search-dir` 指定目录
+
+### 7.2 更简单的协议选择
+
+支持命令行短选项：
+
+- `-p link11clew`
+- `-p mil110a`
+- `-p 4285`
+- `-p auto`
+
+如果不传参数，程序会进入交互菜单。
+
+### 7.3 支持主入口自动检测
+
+`LINK11CLEW.exe` 现在支持：
+
+```powershell
+.\LINK11CLEW.exe file.wav
+.\LINK11CLEW.exe file.wav -p auto
+```
+
+自动检测成功后，会自动调用对应协议的解调器。
+
+当前自动检测覆盖：
+
+- `mil110a`
+- `mil110b`
+- `mil141a`
+- `mil141b`
+- `link11slew`
+- `link11clew`
+- `4285`
+- `4529`
+
+### 7.4 支持 WAV 头自动处理
+
+入口层现在会自动识别标准 WAV 文件：
+
+- 原始 `short` 数据流：按原逻辑读取
+- 标准 WAV：自动跳过 WAV 头，只读取采样数据
+
+当前支持的 WAV 规格：
+
+- `16-bit`
+- `mono`
+- `PCM WAV`
+
+如果不是上述格式，程序会直接报错，不会把错误数据继续送进算法。
+
+### 7.5 支持初始参数覆盖
+
+对于入口层里已有初始化参数的协议，现在可通过命令行覆盖：
+
+- `--frequency`
+- `--data-rate`
 
 示例：
 
-```text
-E:\HFProtocol\shortWaveLib\shortWave-Package\data\STANAG-S4285.wav
-6
+```powershell
+.\LINK11CLEW.exe file.wav -p 4285 --frequency 1800 --data-rate 2400
+.\LINK11CLEW.exe file.wav -p 4529 --frequency 2000 --data-rate 1800
 ```
 
-## 7. 输入输出说明
+### 7.6 `protocolDetec` 也可直接使用
+
+`protocolDetec.exe` 已不再依赖硬编码输入文件，支持：
+
+- 命令行文件路径
+- `-p` 协议过滤
+- 交互模式
+- `--help`
+
+示例：
+
+```powershell
+.\protocolDetec.exe E:\data\file.wav
+.\protocolDetec.exe .\file.wav -p auto
+.\protocolDetec.exe file.wav -p mil110b --search-dir E:\HFProtocol\shortWaveLib\shortWave-Package\data
+```
+
+### 7.7 这轮已修复的问题
+
+- `MIL141B` 的 `delete[]` 释放错误
+- `MIL141B` 的 `EndTime` 未初始化输出
+- 多个控制台完成提示文案错误
+
+### 7.8 详细文档位置
+
+更完整的 CLI 使用说明见：
+
+- `shortWaveLib/CLI_USAGE.md`
+
+## 8. 输入输出说明
 
 ### 7.1 输入
 
@@ -147,7 +268,7 @@ E:\HFProtocol\shortWaveLib\shortWave-Package\data\STANAG-S4285.wav
 - 控制台程序直接打印检测/解调结果（协议名、起止时间、频率、帧信息等）。
 - `HFProtocol_1107/Test/demod/` 下可见历史联调输出样例（`.txt/.bit/.demode`）。
 
-## 8. 常见问题（FAQ）
+## 9. 常见问题（FAQ）
 
 ### Q1: 编译报 `ipps.lib` / `ippsr.lib` 找不到
 
@@ -169,22 +290,23 @@ E:\HFProtocol\shortWaveLib\shortWave-Package\data\STANAG-S4285.wav
 仓库里存在 x64 配置，但多个工程默认依赖仍偏向 `ia32` 路径。  
 建议先在 Win32 跑通，再逐步迁移并修正所有 include/lib/runtime 路径。
 
-## 9. 开发建议
+## 10. 开发建议
 
 - 先用 `shortWave-Package` 的样例数据验证运行链路，再替换为自有数据。
-- 对控制台程序，建议在外层加脚本统一喂入文件路径和协议编号。
-- 若要做批处理，优先基于 `shortWaveLib/LINK11CLEW/main.cpp` 封装参数化入口（替换标准输入交互）。
+- 对控制台程序，优先使用现有命令行参数入口，不必再依赖旧式两行标准输入。
+- 若要做批处理，建议直接基于 `LINK11CLEW.exe <input> -p <protocol>` 或 `-p auto` 的形式封装脚本。
 
-## 10. 关键路径索引
+## 11. 关键路径索引
 
 - 主解决方案：`HFProtocol/HFProtocol_1107/HFProtocol.sln`
 - GUI 主程序：`HFProtocol/HFProtocol_1107/HFProtocol/`
 - 协议检测头：`shortWaveLib/protocolDetec/ProtolDetect.h`
 - 控制台入口：`shortWaveLib/LINK11CLEW/main.cpp`
 - 控制台解决方案：`shortWaveLib/LINK11CLEW.sln`
+- 控制台说明文档：`shortWaveLib/CLI_USAGE.md`
 - 样例数据：`HFProtocol/dataset/` 与 `shortWaveLib/shortWave-Package/data/`
 
-## 11. 说明
+## 12. 说明
 
 - 当前仓库未提供完整官方 README，本文件根据现有工程配置与源码入口整理。
 - 如果你希望，我可以继续补一份英文版 README，或再加一节“协议开发接口速查”（按每个 DLL 的 init/demode/free 三段式 API 列表）。
