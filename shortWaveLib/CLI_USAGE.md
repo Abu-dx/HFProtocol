@@ -20,6 +20,7 @@
 3. 主程序支持自动检测并分发
 - `LINK11CLEW.exe` 可以直接使用 `-p auto`
 - 自动检测成功后会自动调用对应解调器
+- 自动检测链路已修复，可直接对官方样例使用
 
 4. WAV 输入更安全
 - 自动识别标准 `RIFF/WAVE`
@@ -80,11 +81,14 @@
 .\LINK11CLEW.exe file.wav
 .\LINK11CLEW.exe file.wav -p auto
 .\protocolDetec.exe file.wav -p auto
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\Link11-CLEW.wav -p auto
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\M110B.wav -p auto
 ```
 
 说明：
 - `LINK11CLEW.exe` 中的 `auto` 会先做检测，再自动进入匹配的解调器
 - `protocolDetec.exe` 中的 `auto` 会输出检测结果，便于单独验证检测流程
+- 推荐构建配置为 `Release | Win32`
 
 ### 4. 使用交互模式
 
@@ -151,9 +155,12 @@
 
 - `shortWaveLib/common/InputAudio.h`
 - `shortWaveLib/common/InputParser.h`
+- `shortWaveLib/LINK11CLEW.sln`
 - `shortWaveLib/LINK11CLEW/main.cpp`
 - `shortWaveLib/LINK11CLEW/LINK11CLEW.vcxproj`
 - `shortWaveLib/protocolDetec/protocolDetec.cpp`
+- `shortWaveLib/protocolDetec/protocolDetec.vcxproj`
+- `shortWaveLib/shortWaveProtocalWaveLib/ProtolDetect.h`
 
 ## 改动内容
 
@@ -239,10 +246,17 @@
 - `4285`
 - `4529`
 
+自动检测修复完成后，官方样例已验证可用：
+
+- `Link11-CLEW.wav -> link11clew`
+- `M110B.wav -> mil110b`
+
 代码位置：
 
 - `shortWaveLib/LINK11CLEW/main.cpp`
 - `shortWaveLib/LINK11CLEW/LINK11CLEW.vcxproj`
+- `HFProtocol/HFProtocol_1107/ProtolDetect/ProtolDetect.cpp`
+- `shortWaveLib/shortWaveProtocalWaveLib/ProtolDetect.h`
 
 使用方式：
 
@@ -323,7 +337,14 @@ DETECTED_PROTOCOL=mil110b
 ### `shortWaveLib/LINK11CLEW/LINK11CLEW.vcxproj`
 
 - 为 Win32 Debug 和 Release 配置补充 `ProtolDetect.lib` 链接
+- 将 `HFProtocol_1107/ProtolDetect` 设为项目引用，避免主程序继续链接旧版检测库
+- 构建后自动复制匹配版本的 `ProtolDetect.dll`
 - 保持 x64 配置不变，避免影响当前更稳定的 Win32 使用路径
+
+### `shortWaveLib/LINK11CLEW.sln`
+
+- 将 `ProtolDetect` 项目加入 `shortWaveLib` 解决方案
+- 让 `Clean/Rebuild Solution` 时自动一起构建检测库
 
 ### `shortWaveLib/protocolDetec/protocolDetec.cpp`
 
@@ -335,6 +356,11 @@ DETECTED_PROTOCOL=mil110b
 - 新增交互模式
 - 保持检测器核心调用方式不变
 - 新增 `DETECTED_PROTOCOL=...` 结果输出，方便验证
+
+### `shortWaveLib/protocolDetec/protocolDetec.vcxproj`
+
+- 与主程序一样改为优先链接 `HFProtocol_1107` 目录下的 `ProtolDetect`
+- 构建后自动复制对应的 `ProtolDetect.dll`
 
 ### `shortWaveLib/common/InputAudio.h`
 
@@ -388,6 +414,7 @@ DETECTED_PROTOCOL=mil110b
 - x64 配置目前保留了安全兜底逻辑；现阶段更推荐按现有工程结构使用 Win32。
 - 对标准 WAV 输入，程序会自动跳过文件头；对原始 `.dat` 或无头 `short` 数据流，程序仍按原逻辑读取。
 - `--frequency` 和 `--data-rate` 只会覆盖入口层中已有对应初始化参数的协议，不会强行改动所有算法内部状态。
+- 自动检测如果表现异常，优先确认是否使用了 `Release | Win32` 并且已经重新构建了 `ProtolDetect`。
 
 ## 手动验证步骤
 

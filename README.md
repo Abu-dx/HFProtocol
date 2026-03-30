@@ -145,6 +145,10 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 
 ## 7. 控制台入口增强说明
 
+如果你想快速判断“为什么 `-p auto` 会失败”以及“仓库里各协议属于什么家族”，可以直接看这份分析文档：
+
+- [AUTO_DETECT_ANALYSIS.md](E:/HFProtocol/standalone_tools/protocol_generation_suite/AUTO_DETECT_ANALYSIS.md)
+
 当前 `shortWaveLib/LINK11CLEW` 和 `shortWaveLib/protocolDetec` 的入口层已经补充以下能力：
 
 ### 7.1 更友好的输入路径
@@ -185,6 +189,13 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 ```
 
 自动检测成功后，会自动调用对应协议的解调器。
+
+当前版本已完成自动检测链路修复，`Release | Win32` 下可直接对官方样例使用：
+
+```powershell
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\Link11-CLEW.wav -p auto
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\M110B.wav -p auto
+```
 
 当前自动检测覆盖：
 
@@ -255,6 +266,18 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 
 - `shortWaveLib/CLI_USAGE.md`
 
+### 7.9 构建说明补充
+
+`shortWaveLib/LINK11CLEW.sln` 现在已经把 `ProtolDetect` 项目纳入构建链。
+
+建议在修改自动检测相关代码后使用：
+
+1. `Clean Solution`
+2. `Rebuild Solution`
+3. `Release | Win32`
+
+这样可以确保 `LINK11CLEW.exe`、`protocolDetec.exe` 与 `ProtolDetect.dll/lib` 使用的是同一版检测实现。
+
 ## 8. 输入输出说明
 
 ### 7.1 输入
@@ -296,6 +319,32 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 - 对控制台程序，优先使用现有命令行参数入口，不必再依赖旧式两行标准输入。
 - 若要做批处理，建议直接基于 `LINK11CLEW.exe <input> -p <protocol>` 或 `-p auto` 的形式封装脚本。
 
+## 10.5 独立协议生成与解译工具
+
+如果你要快速生成或验证独立样例信号，而不是直接改 C++ 工程，可以优先使用统一工作区：
+
+- [protocol_generation_suite](E:/HFProtocol/standalone_tools/protocol_generation_suite/README.md)
+
+当前已统一纳入：
+
+- `MIL110A`
+- `MIL110B`
+- `LINK11_SLEW`
+- `LINK11_CLEW`
+
+其中：
+
+- [LINK11_SLEW](E:/HFProtocol/standalone_tools/protocol_generation_suite/protocols/link11_slew/README.md)
+  - 已支持多报文单音频、payload 文本显示、黑盒头帧核对
+- [LINK11_CLEW](E:/HFProtocol/standalone_tools/protocol_generation_suite/protocols/link11_clew/README.md)
+  - 已支持独立 Python 闭环，并可让现有 `LINK11CLEW.exe` 稳定报出 burst
+- [MIL110A](E:/HFProtocol/standalone_tools/protocol_generation_suite/protocols/mil110a/README.md)
+- [MIL110B](E:/HFProtocol/standalone_tools/protocol_generation_suite/protocols/mil110b/README.md)
+
+这些工具都已经统一放在：
+
+- `E:\HFProtocol\standalone_tools\protocol_generation_suite\protocols\...`
+
 ## 11. 关键路径索引
 
 - 主解决方案：`HFProtocol/HFProtocol_1107/HFProtocol.sln`
@@ -310,3 +359,4 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 
 - 当前仓库未提供完整官方 README，本文件根据现有工程配置与源码入口整理。
 - 如果你希望，我可以继续补一份英文版 README，或再加一节“协议开发接口速查”（按每个 DLL 的 init/demode/free 三段式 API 列表）。
+

@@ -131,3 +131,5 @@ _UpgradeReport_Files/
 # ==========================================
 Intel IPP.7z
 *.7z
+
+/standalone_tools/

@@ -279,7 +279,7 @@ bool DetectProtocolForFile(const fs::path& inputPath, ProtocolType& protocol)
     }
 
     const int blockLength = 8192;
-    const float inSample = 9.6e3f;
+    const float inSample = inputInfo.sample_rate == 0 ? 9.6e3f : static_cast<float>(inputInfo.sample_rate);
     const Ipp32f threshold = 0.45f;
 
     CProtolDetect detector;
@@ -303,7 +303,7 @@ bool DetectProtocolForFile(const fs::path& inputPath, ProtocolType& protocol)
         ProtocolOut result;
         const BOOL detected = detector.ProtolDetect(
             data,
-            blockLength,
+            static_cast<int>(readSamples),
             threshold,
             selected.data(),
             protocolCount,

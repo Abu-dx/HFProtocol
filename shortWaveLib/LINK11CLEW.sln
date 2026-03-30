@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LINK11CLEW", "LINK11CLEW\LI
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "protocolDetec", "protocolDetec\protocolDetec.vcxproj", "{B81A878D-0342-4C36-AD52-0C3CC8D05752}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProtolDetect", "..\HFProtocol\HFProtocol_1107\ProtolDetect\ProtolDetect.vcxproj", "{EBA360DF-3A0D-49D1-9D85-088D33F9422E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,12 @@ Global
 		{B81A878D-0342-4C36-AD52-0C3CC8D05752}.Release|x64.Build.0 = Release|x64
 		{B81A878D-0342-4C36-AD52-0C3CC8D05752}.Release|x86.ActiveCfg = Release|Win32
 		{B81A878D-0342-4C36-AD52-0C3CC8D05752}.Release|x86.Build.0 = Release|Win32
+		{EBA360DF-3A0D-49D1-9D85-088D33F9422E}.Debug|x86.ActiveCfg = Debug|Win32
+		{EBA360DF-3A0D-49D1-9D85-088D33F9422E}.Debug|x86.Build.0 = Debug|Win32
+		{EBA360DF-3A0D-49D1-9D85-088D33F9422E}.Release|x86.ActiveCfg = Release|Win32
+		{EBA360DF-3A0D-49D1-9D85-088D33F9422E}.Release|x86.Build.0 = Release|Win32
+		{EBA360DF-3A0D-49D1-9D85-088D33F9422E}.Debug|x64.ActiveCfg = Debug|Win32
+		{EBA360DF-3A0D-49D1-9D85-088D33F9422E}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

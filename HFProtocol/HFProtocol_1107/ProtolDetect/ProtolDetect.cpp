@@ -20,6 +20,7 @@
 #endif
 
 
+
 CProtolDetect::CProtolDetect(void)
 {
 	m_Detect110A = NULL;
@@ -31,6 +32,12 @@ CProtolDetect::CProtolDetect(void)
 	m_CDetectCLEW = NULL;
 	m_CReSample = NULL;
 	m_CMIL141Apro = NULL;
+	pBuf = NULL;
+	delayBuf = NULL;
+	outbyte = NULL;
+	delayL = 0;
+	BufPos = 0;
+	maxConvLen = 0;
 }
 CProtolDetect::~CProtolDetect(void)
 {
@@ -206,27 +213,32 @@ BOOL CProtolDetect::ProtolDetect(Ipp16s *pSrc,int nLeng,Ipp32f TH,BOOL *selProto
 		delayL = 4*maxConvLen;
 
 		// 数据相关处理，数据在pBuf中，处理相关长度为  allLen-delayL
-		int pIndex,index,proIndex;
-		Ipp32f maxCof,cof=0;
-		Ipp32f decsumCLEW=0;
-		int indexCLEW,index141A;
-		Ipp32f freCLEW,fre141A;
-		Ipp32f frequency,fre;
-		int dataRate=0,interLeng=0,waveType=0;
-		int mdataRate,minterLeng,mwaveType;
-		int bytelen;
+		int pIndex = 0,index = 0,proIndex = -1;
+		Ipp32f maxCof = 0,cof = 0;
+		Ipp32f decsumCLEW = 0;
+		int indexCLEW = 0,index141A = 0;
+		Ipp32f freCLEW = 0,fre141A = 0;
+		Ipp32f frequency = 0,fre = 0;
+		int dataRate = 0,interLeng = 0,waveType = 0;
+		int mdataRate = 0,minterLeng = 0,mwaveType = 0;
+		int bytelen = 0;
 		
-		int messagelen;
-		BOOL detect[10];
-		bool encrpe;
+		int messagelen = 0;
+		BOOL detect[10] = { FALSE };
+		bool encrpe = false;
 		BOOL pskdetect = FALSE;
 		bool detect141A = false;
-		maxCof = 0;proIndex = 30;
 		for(i=0;i<ProtolNum;i++)
 		{
 			detect[i] = FALSE;
 			if(!selProtol[i])
 				continue;
+			index = 0;
+			cof = 0;
+			fre = 0;
+			mdataRate = 0;
+			minterLeng = 0;
+			mwaveType = 0;
 			if (i==wMIL110A)
 				m_Detect110A->Detect110A(pBuf,allLen-delayL,index,cof,fre,mdataRate,minterLeng,detect[i]);
 			else if(i==wMIL110B)
@@ -247,6 +259,8 @@ BOOL CProtolDetect::ProtolDetect(Ipp16s *pSrc,int nLeng,Ipp32f TH,BOOL *selProto
 				// CString address[200];
 				std::vector<std::string> message(200);
 				std::vector<std::string> address(200);
+				bytelen = 0;
+				messagelen = 0;
 				m_CMIL141Apro->MIL141Ademode(pSrc,nLeng,outbyte,bytelen,message,address,messagelen);
 				index141A = 0;
 				fre141A = m_CMIL141Apro->f0;
@@ -287,7 +301,7 @@ BOOL CProtolDetect::ProtolDetect(Ipp16s *pSrc,int nLeng,Ipp32f TH,BOOL *selProto
 		ippsCopy_32fc(&pBuf[allLen-delayL],delayBuf,delayL);
 		BufPos = delayL;
 
-		if(!selProtol[proIndex])
+		if(proIndex < 0 || proIndex >= ProtolNum || !selProtol[proIndex])
 			return FALSE;
 
 		kname = proIndex;

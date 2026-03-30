@@ -35,7 +35,7 @@ class CMIL141Apro;
 
 struct ProtocolOut
 {
-	CString ProtocolName;
+	CStringA ProtocolName;
 	int index;
 	float maxCor;
 	float frequency;
