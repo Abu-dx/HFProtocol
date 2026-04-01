@@ -52,6 +52,7 @@
 #include "DataFIRDF.h"
 #include "../common/InputAudio.h"
 #include "../common/InputParser.h"
+#include "../common/ExperimentalProtocolDetect.h"
 #include "../shortWaveProtocalWaveLib/ProtolDetect.h"
 
 
@@ -91,17 +92,20 @@ RuntimeOverrides g_runtimeOverrides;
 
 // 调制协议枚举类（映射switch case数字到协议类型）
 enum class ProtocolType {
-    LINK11_CLEW = 1,    // case 1
-    MIL110A = 2,        // case 2
-    MIL110B = 3,        // case 3
-    MIL141A = 4,        // case 4
-    MIL141B = 5,        // case 5
-    STANAG4285 = 6,     // case 6
-    STANAG4529 = 7,     // case 7
-    LINK11_SLEW = 8,   // case 11
-    KG84_FSK2 = 9,     // case 17
-    FSK2_BCH = 10,      // case 18
-    PI4QPSK = 11        // case 19
+    LINK11_CLEW = 1,
+    MIL110A = 2,
+    MIL110B = 3,
+    MIL141A = 4,
+    MIL141B = 5,
+    STANAG4285 = 6,
+    STANAG4529 = 7,
+    LINK11_SLEW = 8,
+    KG84_FSK2 = 9,
+    FSK2_BCH = 10,
+    PI4QPSK = 11,
+    G3_ALE = 12,
+    ANDVT = 13,
+    LINK22_CANDIDATE = 14
 };
 
 void link11CLEW_test(const fs::path& filePath);
@@ -115,6 +119,9 @@ void STANAG4529_test(const fs::path& filePath);
 void KG84_test(const fs::path& filePath);
 void FSK2_BCH_test(const fs::path& filePath);
 void PI4QPSK_test(const fs::path& filePath);
+void G3ALE_test(const fs::path& filePath);
+void ANDVT_test(const fs::path& filePath);
+void Link22Candidate_test(const fs::path& filePath);
 
 std::string ProtocolTypeName(ProtocolType protocol)
 {
@@ -131,6 +138,9 @@ std::string ProtocolTypeName(ProtocolType protocol)
     case ProtocolType::KG84_FSK2: return "kg84";
     case ProtocolType::FSK2_BCH: return "fsk2bch";
     case ProtocolType::PI4QPSK: return "pi4qpsk";
+    case ProtocolType::G3_ALE: return "3g-ale";
+    case ProtocolType::ANDVT: return "andvt";
+    case ProtocolType::LINK22_CANDIDATE: return "link22-candidate";
     default: return "unknown";
     }
 }
@@ -197,7 +207,15 @@ bool TryParseProtocolToken(const std::string& token, ProtocolType& protocol, boo
         {"fsk2bch", ProtocolType::FSK2_BCH},
         {"bch", ProtocolType::FSK2_BCH},
         {"11", ProtocolType::PI4QPSK},
-        {"pi4qpsk", ProtocolType::PI4QPSK}
+        {"pi4qpsk", ProtocolType::PI4QPSK},
+        {"12", ProtocolType::G3_ALE},
+        {"3gale", ProtocolType::G3_ALE},
+        {"3g", ProtocolType::G3_ALE},
+        {"13", ProtocolType::ANDVT},
+        {"andvt", ProtocolType::ANDVT},
+        {"14", ProtocolType::LINK22_CANDIDATE},
+        {"link22candidate", ProtocolType::LINK22_CANDIDATE},
+        {"link22", ProtocolType::LINK22_CANDIDATE}
     };
 
     const auto it = protocolAlias.find(key);
@@ -225,7 +243,7 @@ void PrintUsage(const char* exeName)
         << "  raw PCM short data or 16-bit mono PCM WAV\n\n"
         << "Protocol aliases:\n"
         << "  auto, link11clew, link11slew, mil110a, mil110b, mil141a, mil141b,\n"
-        << "  4285, 4529, kg84, fsk2bch, pi4qpsk\n\n"
+        << "  4285, 4529, kg84, fsk2bch, pi4qpsk, 3g-ale, andvt, link22-candidate\n\n"
         << "Optional overrides:\n"
         << "  --frequency 1800    Override initial center frequency in Hz when the decoder supports it.\n"
         << "  --data-rate 2400    Override initial data rate when the decoder supports it.\n\n"
@@ -250,7 +268,10 @@ bool PromptProtocolMenu(std::string& protocolToken)
               << "  8) link11slew\n"
               << "  9) kg84\n"
               << " 10) fsk2bch\n"
-              << " 11) pi4qpsk\n";
+              << " 11) pi4qpsk\n"
+              << " 12) 3g-ale\n"
+              << " 13) andvt\n"
+              << " 14) link22-candidate\n";
 
     std::string line;
     if (!hfinput::InputParser::ReadLine("Enter number (default 0): ", line)) {
@@ -259,7 +280,6 @@ bool PromptProtocolMenu(std::string& protocolToken)
     protocolToken = line.empty() ? "auto" : line;
     return true;
 }
-
 #if !defined(_WIN64)
 bool DetectProtocolForFile(const fs::path& inputPath, ProtocolType& protocol)
 {
@@ -310,6 +330,13 @@ bool DetectProtocolForFile(const fs::path& inputPath, ProtocolType& protocol)
             result);
 
         if (detected && TryMapDetectedNameToProtocol(CStringA(result.ProtocolName), protocol)) {
+            if (protocol == ProtocolType::MIL141B) {
+                hfexperimental::DetectionResult experimental;
+                std::string refineError;
+                if (hfexperimental::Analyze3GALEByMil141B(inputPath, experimental, refineError) && experimental.protocol == "3g-ale") {
+                    protocol = ProtocolType::G3_ALE;
+                }
+            }
             found = true;
             break;
         }
@@ -363,6 +390,15 @@ void RunProtocol(ProtocolType protocol, const fs::path& filePath)
         break;
     case ProtocolType::PI4QPSK:
         PI4QPSK_test(filePath);
+        break;
+    case ProtocolType::G3_ALE:
+        G3ALE_test(filePath);
+        break;
+    case ProtocolType::ANDVT:
+        ANDVT_test(filePath);
+        break;
+    case ProtocolType::LINK22_CANDIDATE:
+        Link22Candidate_test(filePath);
         break;
     default:
         std::cerr << "Unsupported protocol.\n";
@@ -949,6 +985,72 @@ void MIL141B_test(const fs::path& filePath)
 
 
 
+void G3ALE_test(const fs::path& filePath)
+{
+    hfexperimental::DetectionResult result;
+    std::string error;
+    if (!hfexperimental::Analyze3GALEByMil141B(filePath, result, error))
+    {
+        std::cerr << error << "\n";
+        return;
+    }
+
+    std::cout << hfexperimental::FormatDetectionResultJson(result) << "\n";
+}
+void ANDVT_test(const fs::path& filePath)
+{
+    hfexperimental::DetectionResult result;
+    std::string error;
+    if (!hfexperimental::AnalyzeANDVT(filePath, result, error))
+    {
+        std::cerr << error << "\n";
+        return;
+    }
+
+    if (!result.detected)
+    {
+        std::cout << "ANDVT not detected. " << result.note << "\n";
+        return;
+    }
+
+    std::cout << "Signal type   Score    CenterFreq   TonePeaks   StrongBins   SpanHz\n";
+    char line[256] = { 0 };
+    snprintf(line, sizeof(line), "%-12s  %-7.2f  %-11.2f  %-10d  %-10d  %-10.0f\n",
+        "ANDVT",
+        result.score,
+        result.frequency,
+        result.tone_peak_count,
+        result.strong_bin_count,
+        result.tone_span);
+    std::cout << line;
+    std::cout << result.note << "\n";
+}
+
+void Link22Candidate_test(const fs::path& filePath)
+{
+    hfexperimental::DetectionResult result;
+    std::string error;
+    if (!hfexperimental::DetectLink22BearerCandidate(filePath, result, error))
+    {
+        std::cerr << error << "\n";
+        return;
+    }
+
+    if (!result.detected)
+    {
+        std::cout << "Link22 bearer candidate not detected. " << result.note << "\n";
+        return;
+    }
+
+    std::cout << "Signal type             Score    Frequency     Note\n";
+    char line[256] = { 0 };
+    snprintf(line, sizeof(line), "%-22s  %-7.2f  %-12.2f  %s\n",
+        "link22-candidate",
+        result.score,
+        result.frequency,
+        result.note.c_str());
+    std::cout << line;
+}
 void MIL110A_test(const fs::path& filePath)
 {
     std::ifstream fin;
@@ -1846,3 +1948,6 @@ int main(int argc, char* argv[])
     RunProtocol(protocol, resolvedPath);
     return 0;
 }
+
+
+

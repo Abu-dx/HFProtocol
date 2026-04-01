@@ -1,8 +1,33 @@
-
 #include "StdAfx.h"
 #include "Detect141B.h"
 #include "PreambleConv.h"
 #include "MIL141Bpro.h"
+
+namespace {
+bool IsLegal141BFrequency(Ipp32f frequencyNorm)
+{
+    const Ipp32f frequencyHz = frequencyNorm * 2400.0f;
+    return !((frequencyHz > 5.0f && frequencyHz < 1200.0f) || (frequencyHz > 2100.0f && frequencyHz < 2400.0f));
+}
+
+void ConsiderCandidate(BOOL candDetect, int candWaveType, int candIndex, Ipp32f candCof, Ipp32f candFrequency,
+    BOOL& bestDetect, int& bestWaveType, int& bestIndex, Ipp32f& bestCof, Ipp32f& bestFrequency)
+{
+    if (!candDetect) {
+        return;
+    }
+    if (!IsLegal141BFrequency(candFrequency)) {
+        return;
+    }
+    if (!bestDetect || candCof > bestCof) {
+        bestDetect = TRUE;
+        bestWaveType = candWaveType;
+        bestIndex = candIndex;
+        bestCof = candCof;
+        bestFrequency = candFrequency;
+    }
+}
+}
 
 CDetect141B::CDetect141B(void)
 {
@@ -39,63 +64,66 @@ CDetect141B::~CDetect141B(void)
 }
 
 /************************************************************************/
-/*   nLen ÎªÏà¹ØµãÊı  pSr»º´æÖĞÖÁÉÙÒªÓĞ £¨800£©*4
+/*   nLen Îªç›¸å…³çš„é•¿åº¦  pSrè¾“å…¥çš„æ•°æ®é•¿åº¦è¦é•¿äº 800ç‚¹*4
 /************************************************************************/
 void CDetect141B::Detect141B(Ipp32fc *pSrc,int nLen,int &pIndex,Ipp32f &frequency,int &waveType,BOOL &detect)
 {
-	int mpIndex;
-	Ipp32f mfrequency;
-	BOOL mdetect,mdetect1,mdetect2;
-	Ipp32f maxcof,maxcof1,maxcof2;
-	int pIndextlc,pIndexbw3;
+	int mpIndex = 0;
+	Ipp32f mfrequency = 0.0f;
+	BOOL mdetect = FALSE;
+	BOOL mdetectTlc = FALSE;
+	BOOL mdetectBw3 = FALSE;
+	BOOL mdetectBw0 = FALSE;
+	BOOL mdetectBw1 = FALSE;
+	Ipp32f maxcof = 0.0f;
+	Ipp32f maxcofTlc = 0.0f;
+	Ipp32f maxcofBw3 = 0.0f;
+	Ipp32f maxcofBw0 = 0.0f;
+	Ipp32f maxcofBw1 = 0.0f;
+	Ipp32f frequencyTlc = 0.0f;
+	Ipp32f frequencyBw3 = 0.0f;
+	Ipp32f frequencyBw0 = 0.0f;
+	Ipp32f frequencyBw1 = 0.0f;
+	int pIndextlc = 0;
+	int pIndexbw3 = 0;
+	int pIndexbw0 = 0;
+	int pIndexbw1 = 0;
 
-	m_CPreambleConvtlc->PreambleConv(pSrc,nLen,TLCSym,TLCLen,4,512,pIndextlc,maxcof1,frequency,mdetect1);
+	BOOL bestDetect = FALSE;
+	int bestWaveType = 0;
+	int bestIndex = 0;
+	Ipp32f bestCof = 0.0f;
+	Ipp32f bestFrequency = 0.0f;
 
-	m_CPreambleConv->PreambleConv(pSrc,nLen,BW3Sym,BW3Len,4,1024,pIndexbw3,maxcof2,frequency,mdetect2);
-	
+	m_CPreambleConvtlc->PreambleConv(pSrc,nLen,TLCSym,TLCLen,4,512,pIndextlc,maxcofTlc,frequencyTlc,mdetectTlc);
+	m_CPreambleConv->PreambleConv(pSrc,nLen,BW3Sym,BW3Len,4,1024,pIndexbw3,maxcofBw3,frequencyBw3,mdetectBw3);
+	m_CPreambleConv->PreambleConv(pSrc,nLen,BW0Sym,BW0Len,4,1024,pIndexbw0,maxcofBw0,frequencyBw0,mdetectBw0);
+	m_CPreambleConv->PreambleConv(pSrc,nLen,BW1Sym,BW1Len,4,1024,pIndexbw1,maxcofBw1,frequencyBw1,mdetectBw1);
 
-	if(maxcof1>maxcof2 && mdetect1)
-	{
-		waveType = wMIL141BTLC;
-		detect = mdetect1;
-		pIndex = pIndextlc;
-	}
-	else if(maxcof2>maxcof1 && mdetect2)
-	{
-		waveType = wMIL141BBW3;
-		detect = mdetect2;
-		pIndex = pIndexbw3;
-	}
-	else
-	{
-		detect = FALSE;
-		waveType = 0;
-	}
+	ConsiderCandidate(mdetectTlc, wMIL141BTLC, pIndextlc, maxcofTlc, frequencyTlc,
+		bestDetect, bestWaveType, bestIndex, bestCof, bestFrequency);
+	ConsiderCandidate(mdetectBw3, wMIL141BBW3, pIndexbw3, maxcofBw3, frequencyBw3,
+		bestDetect, bestWaveType, bestIndex, bestCof, bestFrequency);
+	ConsiderCandidate(mdetectBw0, wMIL141BBW0, pIndexbw0, maxcofBw0, frequencyBw0,
+		bestDetect, bestWaveType, bestIndex, bestCof, bestFrequency);
+	ConsiderCandidate(mdetectBw1, wMIL141BBW1, pIndexbw1, maxcofBw1, frequencyBw1,
+		bestDetect, bestWaveType, bestIndex, bestCof, bestFrequency);
 
-	if(waveType==wMIL141BTLC) //  ÕÒµ½TLC
+	if(mdetectTlc)
 	{	
-		// Ê¶±ğ²¨ĞÎ
-		m_CPreambleConv->PreambleConv(&pSrc[pIndex+240*4],(500-BW0Len),BW0Sym,BW0Len,4,1024,mpIndex,maxcof,mfrequency,mdetect);
-		if(mdetect)
-		{
-			waveType = wMIL141BBW0;
-			frequency = mfrequency;
-			detect = mdetect;
-		}
-		else
-		{
-			m_CPreambleConv->PreambleConv(&pSrc[pIndex+240*4],(500-BW1Len),BW1Sym,BW1Len,4,1024,mpIndex,maxcof,mfrequency,mdetect);
-			if(mdetect)
-			{
-				waveType = wMIL141BBW1;
-				frequency = mfrequency;
-				detect = mdetect;
-			}
-			else
-				waveType = wMIL141BTLC;
-		}
+		m_CPreambleConv->PreambleConv(&pSrc[pIndextlc+240*4],(500-BW0Len),BW0Sym,BW0Len,4,1024,mpIndex,maxcof,mfrequency,mdetect);
+		ConsiderCandidate(mdetect, wMIL141BBW0, pIndextlc + 240 * 4 + mpIndex, maxcof, mfrequency,
+			bestDetect, bestWaveType, bestIndex, bestCof, bestFrequency);
+
+		m_CPreambleConv->PreambleConv(&pSrc[pIndextlc+240*4],(500-BW1Len),BW1Sym,BW1Len,4,1024,mpIndex,maxcof,mfrequency,mdetect);
+		ConsiderCandidate(mdetect, wMIL141BBW1, pIndextlc + 240 * 4 + mpIndex, maxcof, mfrequency,
+			bestDetect, bestWaveType, bestIndex, bestCof, bestFrequency);
 	}
-	frequency = frequency*2400;
+
+	detect = bestDetect;
+	waveType = bestWaveType;
+	pIndex = bestIndex;
+	frequency = bestFrequency * 2400.0f;
 }
 
 
@@ -114,16 +142,16 @@ void CDetect141B::MIL141Bdetect_free()
 	ippsFree(delayBuf);
 
 }
-// ÒÑÍê³É²ÉÑùÂÊ×ª»»
+// æ•°æ®é‡‡æ ·ç‡è½¬æ¢
 void CDetect141B::MIL141Bdetect(Ipp16s *pSrc,int nLeng,int &pIndex,Ipp32f &frequency,int &waveType,BOOL &detect)
 {
 	int outLen,allLen;
 
-	ippsHilbertInitAlloc_16s32fc(&pSpec, nLeng, ippAlgHintNone); ///  Ö¸¶¨±ä»»³¤¶Èºó²»ÄÜ±ä»¯
+	ippsHilbertInitAlloc_16s32fc(&pSpec, nLeng, ippAlgHintNone); ///  æŒ‡å®šå˜æ¢é•¿åº¦å’Œæ€§èƒ½å˜åŒ–
 	ippsHilbert_16s32fc(pSrc,&pBuf[BufPos],pSpec);
 	allLen = BufPos + nLeng;
 
-	if(allLen<4*maxConvLen)// ·ÀÖ¹ÊäÈëÊı¾İ²»×ã
+	if(allLen<4*maxConvLen)// é˜²æ­¢è¾“å…¥æ•°æ®ä¸è¶³
 	{
 		BufPos = allLen;
 		return;

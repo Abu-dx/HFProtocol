@@ -111,9 +111,15 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\Debug;$(SolutionDir)protocolDetec;$(SolutionDir)Debug;$(ProjectDir)shortWaveProtocalWaveLib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>MIL141Apro.lib;Link11CLEW.lib;ProtolDetect.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MIL141Apro.lib;MIL141Bpro.lib;Link11CLEW.lib;ProtolDetect.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <PostBuildEvent>
-        <Command>if exist "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\Debug\ProtolDetect.dll" copy /Y "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\Debug\ProtolDetect.dll" "$(OutDir)ProtolDetect.dll"</Command>
+        <Command>if exist "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\ProtolDetect\Debug\ProtolDetect.dll" copy /Y "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\ProtolDetect\Debug\ProtolDetect.dll" "$(OutDir)ProtolDetect.dll"
+if exist "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\MIL141Bpro\Debug\MIL141Bpro.dll" copy /Y "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\MIL141Bpro\Debug\MIL141Bpro.dll" "$(OutDir)MIL141Bpro.dll"
+if not exist "$(ProjectDir)..\$(Configuration)" mkdir "$(ProjectDir)..\$(Configuration)"
+copy /Y "$(TargetPath)" "$(ProjectDir)..\$(Configuration)\$(TargetFileName)"
+if exist "$(TargetDir)$(TargetName).pdb" copy /Y "$(TargetDir)$(TargetName).pdb" "$(ProjectDir)..\$(Configuration)\$(TargetName).pdb"
+if exist "$(OutDir)ProtolDetect.dll" copy /Y "$(OutDir)ProtolDetect.dll" "$(ProjectDir)..\$(Configuration)\ProtolDetect.dll"
+if exist "$(OutDir)MIL141Bpro.dll" copy /Y "$(OutDir)MIL141Bpro.dll" "$(ProjectDir)..\$(Configuration)\MIL141Bpro.dll"</Command>
       </PostBuildEvent>
     </Link>
   </ItemDefinitionGroup>
@@ -135,9 +141,15 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\Release;$(SolutionDir)protocolDetec;$(SolutionDir)Release;$(ProjectDir)modem;$(ProjectDir)shortWaveProtocalWaveLib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>MIL141Apro.lib;Link11CLEW.lib;ProtolDetect.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>MIL141Apro.lib;MIL141Bpro.lib;Link11CLEW.lib;ProtolDetect.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <PostBuildEvent>
-        <Command>if exist "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\Release\ProtolDetect.dll" copy /Y "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\Release\ProtolDetect.dll" "$(OutDir)ProtolDetect.dll"</Command>
+        <Command>if exist "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\ProtolDetect\Release\ProtolDetect.dll" copy /Y "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\ProtolDetect\Release\ProtolDetect.dll" "$(OutDir)ProtolDetect.dll"
+if exist "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\MIL141Bpro\Release\MIL141Bpro.dll" copy /Y "$(ProjectDir)..\..\HFProtocol\HFProtocol_1107\MIL141Bpro\Release\MIL141Bpro.dll" "$(OutDir)MIL141Bpro.dll"
+if not exist "$(ProjectDir)..\$(Configuration)" mkdir "$(ProjectDir)..\$(Configuration)"
+copy /Y "$(TargetPath)" "$(ProjectDir)..\$(Configuration)\$(TargetFileName)"
+if exist "$(TargetDir)$(TargetName).pdb" copy /Y "$(TargetDir)$(TargetName).pdb" "$(ProjectDir)..\$(Configuration)\$(TargetName).pdb"
+if exist "$(OutDir)ProtolDetect.dll" copy /Y "$(OutDir)ProtolDetect.dll" "$(ProjectDir)..\$(Configuration)\ProtolDetect.dll"
+if exist "$(OutDir)MIL141Bpro.dll" copy /Y "$(OutDir)MIL141Bpro.dll" "$(ProjectDir)..\$(Configuration)\MIL141Bpro.dll"</Command>
       </PostBuildEvent>
     </Link>
   </ItemDefinitionGroup>
@@ -182,6 +194,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\HFProtocol\HFProtocol_1107\ProtolDetect\ProtolDetect.vcxproj">
       <Project>{EBA360DF-3A0D-49D1-9D85-088D33F9422E}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\HFProtocol\HFProtocol_1107\MIL141Bpro\MIL141Bpro.vcxproj">
+      <Project>{5E96D735-491D-43A9-8722-8B797C44BAD2}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>

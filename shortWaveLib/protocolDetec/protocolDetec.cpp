@@ -11,13 +11,20 @@
 #include <iostream>
 #include <string>
 
-#include "ProtolDetect.h"
+#include "../shortWaveProtocalWaveLib/ProtolDetect.h"
 #include "../common/InputAudio.h"
 #include "../common/InputParser.h"
+#include "../common/ExperimentalProtocolDetect.h"
 
 #pragma comment(lib, "ProtolDetect.lib")
 
 namespace fs = std::filesystem;
+
+static const int kFilterAuto = -1;
+static const int kFilterUnknown = -2;
+static const int kFilter3GALE = -3;
+static const int kFilterANDVT = -4;
+static const int kFilterLink22Candidate = -5;
 
 struct OutList
 {
@@ -51,7 +58,7 @@ std::string CanonicalToken(const std::string& token)
 int ProtocolFilterIndexFromToken(const std::string& token)
 {
     const std::string key = CanonicalToken(token);
-    if (key.empty() || key == "auto" || key == "0") return -1;
+    if (key.empty() || key == "auto" || key == "0") return kFilterAuto;
     if (key == "1" || key == "mil110a" || key == "m110a" || key == "110a") return wMIL110A;
     if (key == "2" || key == "mil110b" || key == "m110b" || key == "110b") return wMIL110B;
     if (key == "3" || key == "mil141a" || key == "141a") return wMIL141A;
@@ -60,7 +67,10 @@ int ProtocolFilterIndexFromToken(const std::string& token)
     if (key == "6" || key == "link11clew" || key == "link11" || key == "clew") return wLINK11CLEW;
     if (key == "7" || key == "4285" || key == "nato4285" || key == "stanag4285" || key == "s4285") return wNATO4285;
     if (key == "8" || key == "4529" || key == "nato4529" || key == "stanag4529" || key == "s4529") return wNATO4529;
-    return -2;
+    if (key == "9" || key == "3gale" || key == "3g") return kFilter3GALE;
+    if (key == "10" || key == "andvt") return kFilterANDVT;
+    if (key == "11" || key == "link22candidate" || key == "link22") return kFilterLink22Candidate;
+    return kFilterUnknown;
 }
 
 std::string ProtocolTokenFromName(const std::string& protocolName)
@@ -72,6 +82,9 @@ std::string ProtocolTokenFromName(const std::string& protocolName)
     if (key.find("mil110b") != std::string::npos) return "mil110b";
     if (key.find("mil141a") != std::string::npos) return "mil141a";
     if (key.find("mil141b") != std::string::npos) return "mil141b";
+    if (key.find("3gale") != std::string::npos) return "3g-ale";
+    if (key.find("andvt") != std::string::npos) return "andvt";
+    if (key.find("link22candidate") != std::string::npos) return "link22-candidate";
     if (key.find("4529") != std::string::npos) return "4529";
     if (key.find("4285") != std::string::npos) return "4285";
     return "unknown";
@@ -86,7 +99,7 @@ void PrintUsage(const char* exeName)
         << "Input format:\n"
         << "  raw PCM short data or 16-bit mono PCM WAV\n\n"
         << "Protocol aliases:\n"
-        << "  auto, mil110a, mil110b, mil141a, mil141b, link11slew, link11clew, 4285, 4529\n";
+        << "  auto, mil110a, mil110b, mil141a, mil141b, link11slew, link11clew, 4285, 4529, 3g-ale, andvt, link22-candidate\n";
 }
 
 bool PromptProtocolMenu(std::string& protocolToken)
@@ -101,7 +114,10 @@ bool PromptProtocolMenu(std::string& protocolToken)
         << "  5) link11slew\n"
         << "  6) link11clew\n"
         << "  7) 4285\n"
-        << "  8) 4529\n";
+        << "  8) 4529\n"
+        << "  9) 3g-ale\n"
+        << " 10) andvt\n"
+        << " 11) link22-candidate\n";
 
     std::string line;
     if (!hfinput::InputParser::ReadLine("Enter number (default 0): ", line)) {
@@ -111,6 +127,11 @@ bool PromptProtocolMenu(std::string& protocolToken)
     return true;
 }
 
+void PrintExperimentalDetection(const hfexperimental::DetectionResult& result)
+{
+    std::cout << hfexperimental::FormatDetectionResultJson(result) << "\n";
+    std::cout << "DETECTED_PROTOCOL=" << result.token << "\n";
+}
 int main(int argc, char* argv[])
 {
     hfinput::InputParser parser;
@@ -148,10 +169,50 @@ int main(int argc, char* argv[])
     }
 
     const int selectedFilter = ProtocolFilterIndexFromToken(protocolToken);
-    if (selectedFilter == -2) {
+    if (selectedFilter == kFilterUnknown) {
         std::cerr << "Unknown protocol token: " << protocolToken << "\n";
         PrintUsage(argv[0]);
         return 1;
+    }
+
+    if (selectedFilter == kFilter3GALE) {
+        hfexperimental::DetectionResult result;
+        if (!hfexperimental::Analyze3GALEByMil141B(resolvedPath, result, error)) {
+            std::cerr << error << "\n";
+            return 1;
+        }
+        if (!result.detected) {
+            std::cout << "No protocol detected.\n";
+            return 2;
+        }
+        PrintExperimentalDetection(result);
+        return 0;
+    }
+    if (selectedFilter == kFilterANDVT) {
+        hfexperimental::DetectionResult result;
+        if (!hfexperimental::AnalyzeANDVT(resolvedPath, result, error)) {
+            std::cerr << error << "\n";
+            return 1;
+        }
+        if (!result.detected) {
+            std::cout << "No protocol detected.\n";
+            return 2;
+        }
+        PrintExperimentalDetection(result);
+        return 0;
+    }
+    if (selectedFilter == kFilterLink22Candidate) {
+        hfexperimental::DetectionResult result;
+        if (!hfexperimental::DetectLink22BearerCandidate(resolvedPath, result, error)) {
+            std::cerr << error << "\n";
+            return 1;
+        }
+        if (!result.detected) {
+            std::cout << "No protocol detected.\n";
+            return 2;
+        }
+        PrintExperimentalDetection(result);
+        return 0;
     }
 
     std::ifstream fin;
@@ -164,7 +225,7 @@ int main(int argc, char* argv[])
     const int protocolCount = 8;
     std::array<BOOL, 10> selected{};
     selected.fill(FALSE);
-    if (selectedFilter < 0) {
+    if (selectedFilter == kFilterAuto) {
         for (int i = 0; i < protocolCount; ++i) {
             selected[static_cast<size_t>(i)] = TRUE;
         }
@@ -216,14 +277,24 @@ int main(int argc, char* argv[])
             out.interLeng = result.InterLen;
             out.frequency = result.frequency;
 
-            const std::string token = ProtocolTokenFromName(out.sigType);
+            std::string sigType = out.sigType;
+            std::string token = ProtocolTokenFromName(out.sigType);
+            if (token == "mil141b") {
+                hfexperimental::DetectionResult experimental;
+                std::string refineError;
+                if (hfexperimental::Analyze3GALEByMil141B(resolvedPath, experimental, refineError) && experimental.protocol == "3g-ale") {
+                    sigType = experimental.display_name;
+                    token = experimental.token;
+                    out.frequency = experimental.frequency;
+                }
+            }
+
             std::cout << "Detected signal:\n";
-            std::cout << out.sigType
+            std::cout << sigType
                 << " beginTime=" << out.beginTime
                 << " fc=" << out.frequency
                 << " dataRate=" << out.dataRate
                 << "\n";
-            // Machine-readable line consumed by LINK11CLEW auto mode.
             std::cout << "DETECTED_PROTOCOL=" << token << "\n";
         }
 
@@ -240,3 +311,6 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+
+
+

@@ -208,6 +208,27 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 - `4285`
 - `4529`
 
+### 7.3.1 实验性协议级检测
+
+当前额外提供三类实验性协议级检测入口：
+
+- `3g-ale`
+- `andvt`
+- `link22-candidate`
+
+说明：
+
+- `3g-ale` 已接入 `auto` 的 `mil141b` 二级细分，但现在采用严格证据链判决：
+  只有 `BW0 + LE_PDU + CRC/字段一致性 + timing` 同时成立，才会正式输出 `3g-ale`。
+- 当前仓库自带 `3G-ALE.wav` 的最终离线切片结论是 `sample_not_suitable_as_v1_primary_positive`：现有前端只稳定看到 `TLC/BW1/BW3`，没有可用 `BW0` 主证据。
+- 当前 3G-ALE 严格版 v1 已冻结为 `strict_v1_safe_fallback_complete`，详见 `E:/HFProtocol/shortWaveLib/3G_ALE_STRICT_V1_STATUS.md`。
+- `andvt` 目前只支持手动 `-p andvt`，不接入 `auto`。
+- `link22-candidate` 目前只支持手动 `-p link22-candidate`，表示承载波形候选，不代表完整 `Link22` 协议识别。
+
+详细说明与示例命令见：
+
+- [EXPERIMENTAL_PROTOCOLS.md](E:/HFProtocol/shortWaveLib/EXPERIMENTAL_PROTOCOLS.md)
+
 ### 7.4 支持 WAV 头自动处理
 
 入口层现在会自动识别标准 WAV 文件：
@@ -359,4 +380,7 @@ $exe = "E:\HFProtocol\shortWaveLib\shortWave-Package\shortWaveLib-release\LINK11
 
 - 当前仓库未提供完整官方 README，本文件根据现有工程配置与源码入口整理。
 - 如果你希望，我可以继续补一份英文版 README，或再加一节“协议开发接口速查”（按每个 DLL 的 init/demode/free 三段式 API 列表）。
+
+
+
 

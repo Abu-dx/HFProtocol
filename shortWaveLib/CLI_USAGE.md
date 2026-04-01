@@ -246,6 +246,12 @@
 - `4285`
 - `4529`
 
+补充：
+
+- `3g-ale` 的实验性协议级检测已经接入 `mil141b` 的二级细分
+- 但它现在使用严格证据链判决，不会只凭 `BW1/BW3/TLC` 组合就自动升格
+- 如果缺少合法 `BW0 + LE_PDU` 证据，`auto` 会继续保留为 `mil141b`
+
 自动检测修复完成后，官方样例已验证可用：
 
 - `Link11-CLEW.wav -> link11clew`
@@ -462,3 +468,34 @@ DETECTED_PROTOCOL=mil110b
 - `auto` 会打印检测结果并进入对应解调流程
 - 显式 `-p` 会跳过自动检测
 - 输入非法协议名时，程序会打印帮助而不是进入异常状态
+
+## 实验性协议级检测
+
+当前额外提供三类实验性协议级检测入口：
+
+- `3g-ale`
+- `andvt`
+- `link22-candidate`
+
+使用原则：
+
+- `3g-ale`：手动可用，且 `auto` 在命中 `mil141b` 后会继续细分
+- 当前 `3G-ALE.wav` 的结构化输出会给出 `sample_assessment=sample_not_suitable_as_v1_primary_positive`，说明样本里只稳定看到 `TLC/BW1/BW3`，没有可用 `BW0` 主证据
+- 当前 3G-ALE 严格版 v1 已冻结为 `strict_v1_safe_fallback_complete`，详见 `E:/HFProtocol/shortWaveLib/3G_ALE_STRICT_V1_STATUS.md`
+- `andvt`：仅手动候选检测，不进入 `auto`
+- `link22-candidate`：仅手动 bearer candidate 检测，不进入 `auto`
+
+快速示例：
+
+```powershell
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\3G-ALE.wav -p 3g-ale
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\3G-ALE.wav -p auto
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\ANDVT.wav -p andvt
+.\LINK11CLEW.exe E:\HFProtocol\shortWaveLib\shortWave-Package\data\STANAG-4529-uncoded.wav -p link22-candidate
+```
+
+详细说明见：
+
+- [EXPERIMENTAL_PROTOCOLS.md](E:/HFProtocol/shortWaveLib/EXPERIMENTAL_PROTOCOLS.md)
+
+

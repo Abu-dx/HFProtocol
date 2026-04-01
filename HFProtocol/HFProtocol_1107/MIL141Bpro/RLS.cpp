@@ -162,7 +162,7 @@ void RLS::RLS_Update(Ipp32fc pSrc,Ipp32fc yd,Ipp32fc &pDst,BOOL fseupdate,BOOL a
 			if(aid){
 				err.re = yd.re - temp.re;
 				err.im = -(yd.im - temp.im);
-				if (abs(err.re)>100)
+				if (fabs(err.re)>100)
 					RLS_SetZero();
 
 				for (i=0;i<RlsLen;i++)
@@ -182,7 +182,7 @@ void RLS::RLS_Update(Ipp32fc pSrc,Ipp32fc yd,Ipp32fc &pDst,BOOL fseupdate,BOOL a
 				DecPSK(temp,ydec);
 				err.re = ydec.re - temp.re;
 				err.im = -(ydec.im - temp.im);
-				if (abs(err.re)>100)
+				if (fabs(err.re)>100)
 					RLS_SetZero();
 
 				for (i=0;i<RlsLen;i++)

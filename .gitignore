@@ -133,3 +133,5 @@ Intel IPP.7z
 *.7z
 
 /standalone_tools/
+*.pdf
+*.docx
